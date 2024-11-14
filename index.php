@@ -1,75 +1,77 @@
-<?php
-include 'db.php';
-
-// Example query to fetch all companies
-$sql = "SELECT * FROM companies";
-$result = $conn->query($sql);
-?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/css/app.css">
-    <title>Senbee Codetest 3 - Company Manager</title>
+    <title>Company Manager</title>
+    <!-- CSS style below -->
+    <link rel="stylesheet" href="assets/css/styles.css">
 </head>
 <body>
+    <div class="app-container">
+        <!-- Header Section -->
+        <header class="header">
+            <h1>Company Manager</h1>
+            <p class="subtitle">Manage and sync company information</p>
+        </header>
 
-    <!-- Display List of Companies -->
-    <h2>Company List</h2>
-    <?php if ($result->num_rows > 0): ?>
-        <ul>
-            <?php while ($row = $result->fetch_assoc()): ?>
-                <li>CVR: <?= $row['cvr_number'] ?> - Name: <?= $row['name'] ?></li>
-            <?php endwhile; ?>
-        </ul>
-    <?php else: ?>
-        <p>No records found</p>
-    <?php endif; ?>
+        <!-- Input Section -->
+        <section class="input-section">
+            <div class="card">
+                <h2>Add New Company</h2>
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="cvrInput" 
+                        placeholder="Enter 8-digit CVR Number"
+                        maxlength="8"
+                        pattern="\d{8}"
+                    >
+                    <button id="addButton" class="primary-button">Add Company</button>
+                </div>
+                <!-- Error/Success Messages -->
+                <div id="messageArea" class="message-area"></div>
+            </div>
+        </section>
 
-    <!-- Form to Add a New Company -->
-    <form method="POST" action="index.php">
-        <label for="cvr_number">CVR Number:</label>
-        <input type="text" id="cvr_number" name="cvr_number" required>
-        
-        <label for="name">Name:</label>
-        <input type="text" id="name" name="name">
-        
-        <label for="phone">Phone:</label>
-        <input type="text" id="phone" name="phone">
-        
-        <label for="email">Email:</label>
-        <input type="email" id="email" name="email">
-        
-        <label for="address">Address:</label>
-        <input type="text" id="address" name="address">
-        
-        <button type="submit" name="add_company">Add Company</button>
-    </form>
+        <!-- Companies List Section -->
+        <section class="companies-section">
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-state hidden">
+                Loading companies...
+            </div>
 
-    <script src="/js/app.js"></script>
-    
+            <!-- Companies List -->
+            <div id="companiesList" class="companies-grid">
+                <!-- Companies will be loaded here -->
+            </div>
+
+            <!-- No Companies State -->
+            <div id="emptyState" class="empty-state hidden">
+                No companies found. Add one above!
+            </div>
+        </section>
+    </div>
+
+    <!-- Company Card Template -->
+    <template id="companyCardTemplate">
+        <div class="company-card">
+            <div class="company-header">
+                <h3 class="company-name"></h3>
+                <span class="cvr-number"></span>
+            </div>
+            <div class="company-details">
+                <p class="company-address"></p>
+                <p class="company-contact">
+                    <span class="company-phone"></span>
+                    <span class="company-email"></span>
+                </p>
+            </div>
+            <div class="company-actions">
+                <button class="sync-button">Sync</button>
+                <button class="delete-button">Delete</button>
+            </div>
+        </div>
+    </template>
 </body>
 </html>
-
-<?php
-// Insert new company if form is submitted
-if (isset($_POST['add_company'])) {
-    $cvr_number = $_POST['cvr_number'];
-    $name = $_POST['name'];
-    $phone = $_POST['phone'];
-    $email = $_POST['email'];
-    $address = $_POST['address'];
-
-    $sql = "INSERT INTO companies (cvr_number, name, phone, email, address) VALUES (?, ?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sssss", $cvr_number, $name, $phone, $email, $address);
-    $stmt->execute();
-    $stmt->close();
-
-    // Redirect to the same page to refresh the company list
-    header("Location: index.php");
-    exit();
-}
-?>
