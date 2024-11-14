@@ -8,11 +8,11 @@ $api = new CVRAPI();
 
 // Test valid CVR number
 $testCvr = '28856636'; // ÅRHUS ApS
-echo "1. Testing valid CVR lookup ($testCvr):\n";
+echo "1. Testing CVR lookup ($testCvr):\n";
 $result = $api->fetchCompanyData($testCvr);
 
 if ($result['success']) {
-    echo "✓ Company found:\n";
+    echo "✓ Company found" . ($result['source'] === 'mock' ? " (using mock data)" : "") . ":\n";
     echo "  - Name: {$result['data']['name']}\n";
     echo "  - Address: {$result['data']['address']}\n";
     echo "  - Phone: {$result['data']['phone']}\n";
