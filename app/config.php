@@ -1,6 +1,9 @@
 <?php
 // app/config.php
 
+// Define if we're in development environment
+define('DEVELOPMENT', true);  // Change to false in production
+
 class Database {
     private static $instance = null;
     private $conn;

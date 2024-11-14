@@ -1,4 +1,4 @@
-/* styles.css */
+/* assets/css/styles.css */
 
 /* Reset and Base Styles */
 * {
@@ -156,11 +156,15 @@ button {
 .error-message {
     background-color: #fde8e8;
     color: #e74c3c;
+    padding: 10px;
+    border-radius: 4px;
 }
 
 .success-message {
     background-color: #e8f8e8;
     color: #2ecc71;
+    padding: 10px;
+    border-radius: 4px;
 }
 
 /* Responsive Design */
