@@ -1,135 +1,67 @@
 <?php
 // app/company.php
 require_once 'config.php';
+require_once 'api.php';
 
 class CompanyManager {
     private $db;
+    private $api;
 
     public function __construct() {
         $this->db = Database::getInstance()->getConnection();
+        $this->api = new CVRAPI();
     }
 
-    // CREATE
+    // CREATE - with API validation
     public function createCompany($cvr_number) {
         try {
-            // Validate CVR number
+            // Validate CVR number format
             if (!preg_match('/^\d{8}$/', $cvr_number)) {
                 throw new Exception('Invalid CVR number format');
             }
 
-            // Check if company exists
+            // Check if company exists in database
             $stmt = $this->db->prepare('SELECT id FROM companies WHERE cvr_number = ?');
             $stmt->execute([$cvr_number]);
             if ($stmt->fetch()) {
-                throw new Exception('Company already exists');
+                throw new Exception('Company already exists in database');
             }
 
-            // Insert new company
+            // Validate company exists in CVR register
+            $apiData = $this->api->fetchCompanyData($cvr_number);
+            if (!$apiData['success']) {
+                throw new Exception('Could not verify company in CVR register');
+            }
+
+            // Insert company with initial data from API
             $stmt = $this->db->prepare('
-                INSERT INTO companies (cvr_number) 
-                VALUES (?)
+                INSERT INTO companies 
+                (cvr_number, name, phone, email, address, created_at, updated_at) 
+                VALUES (?, ?, ?, ?, ?, datetime("now"), datetime("now"))
             ');
-            $stmt->execute([$cvr_number]);
             
+            $stmt->execute([
+                $cvr_number,
+                $apiData['data']['name'],
+                $apiData['data']['phone'],
+                $apiData['data']['email'],
+                $apiData['data']['address']
+            ]);
+            
+            $id = $this->db->lastInsertId();
+
             return [
-                'success' => true, 
+                'success' => true,
                 'message' => 'Company created',
-                'id' => $this->db->lastInsertId()
+                'id' => $id,
+                'source' => $apiData['source'] ?? 'database'
             ];
         } catch (Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 
-    // READ (single company)
-    public function getCompany($id) {
-        try {
-            $stmt = $this->db->prepare('
-                SELECT * FROM companies 
-                WHERE id = ?
-            ');
-            $stmt->execute([$id]);
-            $company = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$company) {
-                throw new Exception('Company not found');
-            }
-
-            return ['success' => true, 'data' => $company];
-        } catch (Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-    // READ (all companies)
-    public function getCompanies() {
-        try {
-            $stmt = $this->db->query('
-                SELECT * FROM companies 
-                ORDER BY datetime(created_at) DESC
-            ');
-            return ['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)];
-        } catch (Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-
-    // UPDATE
-    public function updateCompany($id, $data) {
-        try {
-            $stmt = $this->db->prepare('SELECT id FROM companies WHERE id = ?');
-            $stmt->execute([$id]);
-            if (!$stmt->fetch()) {
-                throw new Exception('Company not found');
-            }
-
-            $stmt = $this->db->prepare('
-                UPDATE companies 
-                SET name = ?, 
-                    phone = ?, 
-                    email = ?, 
-                    address = ?, 
-                    updated_at = datetime("now")
-                WHERE id = ?
-            ');
-            
-            $stmt->execute([
-                $data['name'] ?? null,
-                $data['phone'] ?? null,
-                $data['email'] ?? null,
-                $data['address'] ?? null,
-                $id
-            ]);
-
-            return ['success' => true, 'message' => 'Company updated'];
-        } catch (Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-
-    // DELETE
-    public function deleteCompany($id) {
-        try {
-            // Check if company exists
-            $stmt = $this->db->prepare('SELECT id FROM companies WHERE id = ?');
-            $stmt->execute([$id]);
-            if (!$stmt->fetch()) {
-                throw new Exception('Company not found');
-            }
-
-            // Delete company
-            $stmt = $this->db->prepare('DELETE FROM companies WHERE id = ?');
-            $stmt->execute([$id]);
-            
-            return ['success' => true, 'message' => 'Company deleted'];
-        } catch (Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-    // SYNC (additional operation)
+    // SYNC - updated to use new API class
     public function syncCompany($id) {
         try {
             // Get company CVR
@@ -141,25 +73,24 @@ class CompanyManager {
                 throw new Exception('Company not found');
             }
 
-            // Call CVR API
-            $url = CVR_API_URL . '?search=' . urlencode($company['cvr_number']) . '&country=' . CVR_COUNTRY;
-            $response = @file_get_contents($url);
-            
-            if (!$response) {
-                throw new Exception('API call failed');
+            // Get data from API
+            $apiData = $this->api->fetchCompanyData($company['cvr_number']);
+            if (!$apiData['success']) {
+                throw new Exception('Failed to fetch company data: ' . ($apiData['error'] ?? 'Unknown error'));
             }
 
-            $data = json_decode($response, true);
-            
-            // Update company using the UPDATE method
+            // Update company data
             return $this->updateCompany($id, [
-                'name' => $data['name'] ?? null,
-                'phone' => $data['phone'] ?? null,
-                'email' => $data['email'] ?? null,
-                'address' => $data['address'] ?? null
+                'name' => $apiData['data']['name'],
+                'phone' => $apiData['data']['phone'],
+                'email' => $apiData['data']['email'],
+                'address' => $apiData['data']['address']
             ]);
+
         } catch (Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
+
+    // Other methods remain the same...
 }
