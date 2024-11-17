@@ -1,19 +1,28 @@
 <?php
 // app/config.php
 
-// Define if we're in development environment
-define('DEVELOPMENT', true);  // Change to false in production
+// Development mode
+define('DEVELOPMENT', true);
 
+// Database configuration
 class Database {
     private static $instance = null;
     private $conn;
 
     private function __construct() {
         try {
-            $this->conn = new PDO('sqlite:' . __DIR__ . '/../data/companies.db');
+            // Use ROOT_PATH constant to ensure correct path
+            $dbPath = dirname(__DIR__) . '/data/companies.db';
+            
+            // Check if database file exists
+            if (!file_exists($dbPath)) {
+                throw new Exception("Database file not found: $dbPath");
+            }
+
+            $this->conn = new PDO('sqlite:' . $dbPath);
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch(PDOException $e) {
-            die("Connection failed: " . $e->getMessage());
+            die("Database connection failed: " . $e->getMessage());
         }
     }
 
@@ -29,6 +38,6 @@ class Database {
     }
 }
 
-// Constants for API
+// API Configuration
 define('CVR_API_URL', 'https://cvrapi.dk/api');
 define('CVR_COUNTRY', 'dk');

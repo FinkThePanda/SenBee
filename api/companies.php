@@ -1,6 +1,10 @@
 <?php
 // api/companies.php
 
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 header('Content-Type: application/json');
 require_once '../app/config.php';
 require_once '../app/company.php';
@@ -8,19 +12,19 @@ require_once '../app/company.php';
 try {
     $companyManager = new CompanyManager();
     
+    // Log the request method and data
+    file_put_contents('debug.log', date('Y-m-d H:i:s') . ' - Method: ' . $_SERVER['REQUEST_METHOD'] . "\n", FILE_APPEND);
+
     switch($_SERVER['REQUEST_METHOD']) {
         case 'GET':
-            // Get all companies or single company
-            if (isset($_GET['id'])) {
-                $result = $companyManager->getCompany($_GET['id']);
-            } else {
-                $result = $companyManager->getCompanies();
-            }
+            $result = $companyManager->getCompanies();
             break;
 
         case 'POST':
-            // Add new company
-            $data = json_decode(file_get_contents('php://input'), true);
+            $input = file_get_contents('php://input');
+            file_put_contents('debug.log', date('Y-m-d H:i:s') . ' - Input: ' . $input . "\n", FILE_APPEND);
+            
+            $data = json_decode($input, true);
             if (!isset($data['cvr_number'])) {
                 throw new Exception('CVR number is required');
             }
@@ -28,7 +32,6 @@ try {
             break;
 
         case 'DELETE':
-            // Delete company
             if (!isset($_GET['id'])) {
                 throw new Exception('Company ID is required');
             }
@@ -42,9 +45,12 @@ try {
     echo json_encode($result);
 
 } catch (Exception $e) {
-    http_response_code(400);
-    echo json_encode([
+    $error = [
         'success' => false,
-        'error' => $e->getMessage()
-    ]);
+        'error' => $e->getMessage(),
+        'trace' => $e->getTraceAsString()
+    ];
+    file_put_contents('debug.log', date('Y-m-d H:i:s') . ' - Error: ' . json_encode($error) . "\n", FILE_APPEND);
+    http_response_code(400);
+    echo json_encode($error);
 }
