@@ -41,3 +41,4 @@ class Database {
 // API Configuration
 define('CVR_API_URL', 'https://cvrapi.dk/api');
 define('CVR_COUNTRY', 'dk');
+define('CVR_USER_AGENT', 'CompanyManager/1.0');
