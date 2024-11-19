@@ -1,5 +1,6 @@
 <?php
 // app/company.php
+
 require_once 'config.php';
 
 class CompanyManager {
@@ -9,48 +10,6 @@ class CompanyManager {
         $this->db = Database::getInstance()->getConnection();
     }
 
-    // Create new company
-    public function createCompany($cvr_number) {
-        try {
-            if (!preg_match('/^\d{8}$/', $cvr_number)) {
-                throw new Exception('Invalid CVR number format');
-            }
-
-            $stmt = $this->db->prepare('SELECT id FROM companies WHERE cvr_number = ?');
-            $stmt->execute([$cvr_number]);
-            if ($stmt->fetch()) {
-                throw new Exception('Company already exists');
-            }
-
-            // Insert basic company record
-            $stmt = $this->db->prepare('
-                INSERT INTO companies 
-                (cvr_number, created_at, updated_at) 
-                VALUES (?, datetime("now"), datetime("now"))
-            ');
-            $stmt->execute([$cvr_number]);
-            
-            $newId = $this->db->lastInsertId();
-
-            // Immediately sync with CVR API
-            $syncResult = $this->syncCompany($newId);
-            
-            if (!$syncResult['success']) {
-                // Log the sync failure but don't treat it as a creation failure
-                error_log("Failed to sync new company: " . ($syncResult['error'] ?? 'Unknown error'));
-            }
-
-            return [
-                'success' => true,
-                'message' => 'Company created successfully',
-                'id' => $newId
-            ];
-        } catch (Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-    // Get all companies
     public function getCompanies() {
         try {
             $stmt = $this->db->query('SELECT * FROM companies ORDER BY created_at DESC');
@@ -60,7 +19,6 @@ class CompanyManager {
         }
     }
 
-    // Get single company
     public function getCompany($id) {
         try {
             $stmt = $this->db->prepare('SELECT * FROM companies WHERE id = ?');
@@ -77,21 +35,36 @@ class CompanyManager {
         }
     }
 
-    // Delete company
-    public function deleteCompany($id) {
+    public function createCompany($cvr_number) {
         try {
-            $stmt = $this->db->prepare('DELETE FROM companies WHERE id = ?');
-            $stmt->execute([$id]);
-            return ['success' => true, 'message' => 'Company deleted'];
+            if (!preg_match('/^\d{8}$/', $cvr_number)) {
+                throw new Exception('Invalid CVR number format');
+            }
+
+            $stmt = $this->db->prepare('SELECT id FROM companies WHERE cvr_number = ?');
+            $stmt->execute([$cvr_number]);
+            if ($stmt->fetch()) {
+                throw new Exception('Company already exists');
+            }
+
+            $stmt = $this->db->prepare('
+                INSERT INTO companies (cvr_number, created_at, updated_at) 
+                VALUES (?, datetime("now"), datetime("now"))
+            ');
+            $stmt->execute([$cvr_number]);
+            
+            return [
+                'success' => true,
+                'message' => 'Company created successfully',
+                'id' => $this->db->lastInsertId()
+            ];
         } catch (Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 
-    // Sync company
     public function syncCompany($id) {
         try {
-            // Get company CVR
             $stmt = $this->db->prepare('SELECT cvr_number FROM companies WHERE id = ?');
             $stmt->execute([$id]);
             $company = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -99,56 +72,52 @@ class CompanyManager {
             if (!$company) {
                 throw new Exception('Company not found');
             }
-
-            // Call CVR API
-            $url = sprintf(
-                '%s?search=%s&country=%s',
-                CVR_API_URL,
-                urlencode($company['cvr_number']),
-                CVR_COUNTRY
-            );
-
-            // Set context for API call
-            $context = stream_context_create([
-                'http' => [
-                    'method' => 'GET',
-                    'header' => [
-                        'User-Agent: CompanyManager/1.0'
-                    ]
-                ]
+    
+            $ch = curl_init();
+            $url = 'https://cvrapi.dk/api?search=' . urlencode($company['cvr_number']) . '&country=dk';
+            
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_USERAGENT => 'Company Manager - Educational Project',
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_SSL_VERIFYPEER => false,  // Disable SSL verification
+                CURLOPT_SSL_VERIFYHOST => 0       // Disable host verification
             ]);
-
-            $response = @file_get_contents($url, false, $context);
-            
+    
+            $response = curl_exec($ch);
+            $error = curl_error($ch);
+            curl_close($ch);
+    
+            if ($error) {
+                throw new Exception('cURL Error: ' . $error);
+            }
+    
             if (!$response) {
-                throw new Exception('Failed to fetch data from CVR API');
+                throw new Exception('Empty response from API');
             }
-
+    
             $data = json_decode($response, true);
-            
             if (!$data) {
-                throw new Exception('Invalid response from CVR API');
+                throw new Exception('Invalid JSON response');
             }
-
-            // Update company data
+    
             $stmt = $this->db->prepare('
                 UPDATE companies 
-                SET 
-                    name = ?, 
+                SET name = ?, 
                     phone = ?, 
                     email = ?, 
                     address = ?,
-                    last_synced = datetime("now"),
-                    updated_at = datetime("now")
+                    last_synced = datetime("now")
                 WHERE id = ?
             ');
-            
+    
             $address = implode(', ', array_filter([
-                $data['address'] ?? null,
-                $data['zipcode'] ?? null,
-                $data['city'] ?? null
+                $data['address'] ?? '',
+                $data['zipcode'] ?? '',
+                $data['city'] ?? ''
             ]));
-
+    
             $stmt->execute([
                 $data['name'] ?? null,
                 $data['phone'] ?? null,
@@ -156,8 +125,18 @@ class CompanyManager {
                 $address,
                 $id
             ]);
-
+    
             return ['success' => true, 'message' => 'Company synced successfully'];
+        } catch (Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    public function deleteCompany($id) {
+        try {
+            $stmt = $this->db->prepare('DELETE FROM companies WHERE id = ?');
+            $stmt->execute([$id]);
+            return ['success' => true, 'message' => 'Company deleted successfully'];
         } catch (Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
