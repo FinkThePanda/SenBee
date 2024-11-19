@@ -95,6 +95,40 @@ try {
             </div>
         </section>
 
+        <!-- Search Section -->
+        <section class="search-filter-section">
+            <div class="card">
+                <div class="search-controls">
+                    <div class="search-group">
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="Search companies..." 
+                            class="search-input"
+                        >
+                        <select id="searchField" class="filter-select">
+                            <option value="all">All Fields</option>
+                            <option value="name">Name</option>
+                            <option value="cvr_number">CVR Number</option>
+                            <option value="address">Address</option>
+                            <option value="email">Email</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <select id="sortField" class="filter-select">
+                            <option value="name">Sort by Name</option>
+                            <option value="cvr_number">Sort by CVR</option>
+                            <option value="created_at">Sort by Date</option>
+                        </select>
+                        <select id="sortOrder" class="filter-select">
+                            <option value="asc">Ascending</option>
+                            <option value="desc">Descending</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Companies List Section -->
         <section class="companies-section">
             <!-- Loading State -->

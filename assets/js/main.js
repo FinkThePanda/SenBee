@@ -7,9 +7,13 @@ class CompanyManager {
     constructor() {
         if (DEBUG) console.log('Initializing CompanyManager');
         
-        // Initialize properties
         this.initializeElements();
         this.bindEvents();
+        
+        // Store original data
+        this.companiesData = [];
+        
+        // Load initial data
         this.loadCompanies();
     }
 
@@ -22,6 +26,12 @@ class CompanyManager {
         this.messageArea = document.getElementById('messageArea');
         this.cardTemplate = document.getElementById('companyCardTemplate');
 
+        // Search and filter elements
+        this.searchInput = document.getElementById('searchInput');
+        this.searchField = document.getElementById('searchField');
+        this.sortField = document.getElementById('sortField');
+        this.sortOrder = document.getElementById('sortOrder');
+
         if (DEBUG) {
             console.log('DOM Elements initialized:', {
                 cvrInput: this.cvrInput,
@@ -29,13 +39,17 @@ class CompanyManager {
                 companiesList: this.companiesList,
                 loadingState: this.loadingState,
                 messageArea: this.messageArea,
-                cardTemplate: this.cardTemplate
+                cardTemplate: this.cardTemplate,
+                searchInput: this.searchInput,
+                searchField: this.searchField,
+                sortField: this.sortField,
+                sortOrder: this.sortOrder
             });
         }
     }
 
     bindEvents() {
-        // Bind event listeners
+        // Add company events
         if (this.addButton) {
             this.addButton.addEventListener('click', () => this.addCompany());
         }
@@ -45,10 +59,23 @@ class CompanyManager {
                 if (e.key === 'Enter') this.addCompany();
             });
             
-            // Input validation
             this.cvrInput.addEventListener('input', (e) => {
                 e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
             });
+        }
+
+        // Search and filter events
+        if (this.searchInput) {
+            this.searchInput.addEventListener('input', () => this.filterCompanies());
+        }
+        if (this.searchField) {
+            this.searchField.addEventListener('change', () => this.filterCompanies());
+        }
+        if (this.sortField) {
+            this.sortField.addEventListener('change', () => this.filterCompanies());
+        }
+        if (this.sortOrder) {
+            this.sortOrder.addEventListener('change', () => this.filterCompanies());
         }
         
         if (DEBUG) console.log('Events bound successfully');
@@ -94,7 +121,8 @@ class CompanyManager {
             if (DEBUG) console.log('Companies data:', data);
 
             if (data.success) {
-                this.displayCompanies(data.data);
+                this.companiesData = data.data;
+                this.filterCompanies();
             } else {
                 throw new Error(data.error || 'Unknown error');
             }
@@ -104,6 +132,59 @@ class CompanyManager {
         } finally {
             this.showLoading(false);
         }
+    }
+
+    filterCompanies() {
+        if (!this.companiesData) return;
+
+        const searchTerm = this.searchInput?.value.toLowerCase() || '';
+        const searchField = this.searchField?.value || 'all';
+        const sortField = this.sortField?.value || 'name';
+        const sortOrder = this.sortOrder?.value || 'asc';
+
+        if (DEBUG) {
+            console.log('Filtering companies with:', {
+                searchTerm,
+                searchField,
+                sortField,
+                sortOrder
+            });
+        }
+
+        // Filter
+        let filteredCompanies = [...this.companiesData];
+        
+        if (searchTerm) {
+            filteredCompanies = filteredCompanies.filter(company => {
+                if (searchField === 'all') {
+                    return Object.values(company).some(value => 
+                        String(value).toLowerCase().includes(searchTerm)
+                    );
+                } else {
+                    const value = company[searchField];
+                    return value && String(value).toLowerCase().includes(searchTerm);
+                }
+            });
+        }
+
+        // Sort
+        filteredCompanies.sort((a, b) => {
+            let valueA = (a[sortField] || '').toString().toLowerCase();
+            let valueB = (b[sortField] || '').toString().toLowerCase();
+
+            if (sortField === 'created_at') {
+                valueA = new Date(valueA);
+                valueB = new Date(valueB);
+            }
+
+            if (sortOrder === 'asc') {
+                return valueA < valueB ? -1 : valueA > valueB ? 1 : 0;
+            } else {
+                return valueA > valueB ? -1 : valueA < valueB ? 1 : 0;
+            }
+        });
+
+        this.displayCompanies(filteredCompanies);
     }
 
     displayCompanies(companies) {
@@ -150,7 +231,6 @@ class CompanyManager {
 
         const cvr = this.cvrInput.value.trim();
         
-        // Validate CVR
         if (!cvr) {
             this.showMessage('Please enter a CVR number', true);
             return;
