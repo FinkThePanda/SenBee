@@ -3,6 +3,9 @@
 ## Overview
 The Company Manager is a web-based application that allows users to manage Danish companies using their CVR (Central Business Register) numbers. The application provides functionality to add, view, update, and delete company information, with automatic synchronization with the Danish CVR API.
 
+## Website
+The application has been deployed on the **https://git.dk/** site.
+
 ## Features
 - Add companies using CVR numbers
 - Automatic data synchronization with CVRAPI.dk
