@@ -29,7 +29,7 @@ The application has been deployed on the **https://git.dk/** site.
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/company-manager.git
+git clone git@github.com:FinkThePanda/SenBee.git
 cd company-manager
 ```
 
